@@ -78,10 +78,7 @@ func parseFrontmatter(content string) (frontmatter, string, error) {
 	const delim = "---"
 	content = strings.TrimLeft(content, "\r\n")
 	// get first line and trim trailing whitespace before checking delimiter
-	firstLine := content
-	if idx := strings.Index(content, "\n"); idx >= 0 {
-		firstLine = content[:idx]
-	}
+	firstLine, _, _ := strings.Cut(content, "\n")
 	if strings.TrimRight(firstLine, " \t\r") != delim {
 		return frontmatter{}, content, nil
 	}
@@ -89,12 +86,10 @@ func parseFrontmatter(content string) (frontmatter, string, error) {
 	rest := content[len(firstLine):]
 	rest = strings.TrimPrefix(rest, "\n")
 	// find closing ---
-	idx := strings.Index(rest, "\n"+delim)
-	if idx == -1 {
+	yamlPart, body, found := strings.Cut(rest, "\n"+delim)
+	if !found {
 		return frontmatter{}, content, nil
 	}
-	yamlPart := rest[:idx]
-	body := rest[idx+1+len(delim):]
 	body = strings.TrimPrefix(body, "\n")
 
 	var fm frontmatter
@@ -112,8 +107,7 @@ func ProjectNameFromSlug(slug string) string {
 	if err == nil {
 		// encode home path as slug: "/Users/foo" -> "-Users-foo"
 		homeSlug := "-" + strings.ReplaceAll(strings.TrimPrefix(home, "/"), "/", "-")
-		if strings.HasPrefix(slug, homeSlug) {
-			rest := strings.TrimPrefix(slug, homeSlug)
+		if rest, ok := strings.CutPrefix(slug, homeSlug); ok {
 			rest = strings.TrimPrefix(rest, "-")
 			if rest != "" {
 				return rest
