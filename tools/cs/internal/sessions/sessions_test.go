@@ -68,10 +68,10 @@ func TestFormatDuration(t *testing.T) {
 
 func TestLoadActiveSessions(t *testing.T) {
 	dir := t.TempDir()
-	content := `{"pid":1234,"sessionId":"aaa-bbb","cwd":"/tmp/myproject","startedAt":` +
-		fmt.Sprintf("%d", (time.Now().Unix()-300)*1000) +
-		`,"kind":"interactive","entrypoint":"cli","name":"my-test-session"}`
-	if err := os.WriteFile(filepath.Join(dir, "1234.json"), []byte(content), 0644); err != nil {
+	pid := os.Getpid()
+	content := fmt.Sprintf(`{"pid":%d,"sessionId":"aaa-bbb","cwd":"/tmp/myproject","startedAt":%d,"kind":"interactive","entrypoint":"cli","name":"my-test-session"}`,
+		pid, (time.Now().Unix()-300)*1000)
+	if err := os.WriteFile(filepath.Join(dir, fmt.Sprintf("%d.json", pid)), []byte(content), 0644); err != nil {
 		t.Fatal(err)
 	}
 

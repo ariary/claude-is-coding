@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -89,6 +90,9 @@ func projectFromCwd(cwd string) string {
 // FormatAge returns a human-readable age string for a Unix timestamp.
 func FormatAge(ts int64) string {
 	secs := time.Now().Unix() - ts
+	if secs < 0 {
+		secs = 0
+	}
 	switch {
 	case secs < 60:
 		return fmt.Sprintf("%ds ago", secs)
@@ -153,6 +157,12 @@ func loadActiveSessions(dir string) ([]Session, error) {
 		if err := json.Unmarshal(data, &f); err != nil || f.SessionID == "" {
 			continue
 		}
+		// Verify the process is still alive
+		if f.PID > 0 {
+			if err := syscall.Kill(f.PID, 0); err == syscall.ESRCH {
+				continue // process is gone
+			}
+		}
 		startedSec := f.StartedAt / 1000
 		s := Session{
 			ID:       f.SessionID,
@@ -216,10 +226,6 @@ func loadHistoricalSessions(projectsDir string, limit int) ([]Session, error) {
 		return files[i].mtime.After(files[j].mtime)
 	})
 
-	if limit > 0 && len(files) > limit {
-		files = files[:limit]
-	}
-
 	var result []Session
 	for _, f := range files {
 		s, err := parseSessionFile(f.path, f.mtime)
@@ -249,7 +255,7 @@ func parseSessionFile(path string, mtime time.Time) (*Session, error) {
 	var firstTS, lastTS time.Time
 
 	scanner := bufio.NewScanner(fh)
-	scanner.Buffer(make([]byte, 1024*1024), 1024*1024)
+	scanner.Buffer(make([]byte, 1024*1024), 8*1024*1024)
 	for scanner.Scan() {
 		line := scanner.Bytes()
 		var entry jsonlEntry
@@ -271,6 +277,9 @@ func parseSessionFile(path string, mtime time.Time) (*Session, error) {
 				lastTS = t
 			}
 		}
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("scanning %s: %w", path, err)
 	}
 
 	var duration int64

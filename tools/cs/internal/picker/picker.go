@@ -2,6 +2,7 @@ package picker
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -32,8 +33,10 @@ func Run(sess []sessions.Session) error {
 	}
 
 	selected, err := gumFilter(lines)
-	if err != nil || selected == "" {
-		// User hit Escape / Ctrl-C — exit cleanly
+	if err != nil {
+		return err
+	}
+	if selected == "" {
 		os.Exit(0)
 	}
 
@@ -108,7 +111,11 @@ func gumFilter(lines []string) (string, error) {
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	if err := cmd.Run(); err != nil {
-		return "", err
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) && exitErr.ExitCode() == 1 {
+			return "", nil // user cancelled (Escape/Ctrl-C)
+		}
+		return "", fmt.Errorf("gum filter: %w", err)
 	}
 	return strings.TrimRight(out.String(), "\n"), nil
 }
