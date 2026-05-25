@@ -1,6 +1,7 @@
 package memory
 
 import (
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -41,7 +42,7 @@ func Scan(baseDir string) ([]Entry, error) {
 		slug := filepath.Base(filepath.Dir(filepath.Dir(path)))
 		entry, err := parseEntry(path, slug)
 		if err != nil {
-			// skip malformed files silently
+			log.Printf("cmem: skipping %s: %v\n", path, err)
 			continue
 		}
 		entries = append(entries, entry)
@@ -75,20 +76,25 @@ func parseEntry(path, slug string) (Entry, error) {
 // parseFrontmatter splits "---\n<yaml>\n---\n<body>" into frontmatter and body.
 func parseFrontmatter(content string) (frontmatter, string, error) {
 	const delim = "---"
-	// strip leading newlines/spaces
 	content = strings.TrimLeft(content, "\r\n")
-	if !strings.HasPrefix(content, delim) {
+	// get first line and trim trailing whitespace before checking delimiter
+	firstLine := content
+	if idx := strings.Index(content, "\n"); idx >= 0 {
+		firstLine = content[:idx]
+	}
+	if strings.TrimRight(firstLine, " \t\r") != delim {
 		return frontmatter{}, content, nil
 	}
-	// skip the opening ---
-	rest := content[len(delim):]
+	// skip the opening --- line
+	rest := content[len(firstLine):]
+	rest = strings.TrimPrefix(rest, "\n")
+	// find closing ---
 	idx := strings.Index(rest, "\n"+delim)
 	if idx == -1 {
 		return frontmatter{}, content, nil
 	}
 	yamlPart := rest[:idx]
 	body := rest[idx+1+len(delim):]
-	// strip leading newline from body
 	body = strings.TrimPrefix(body, "\n")
 
 	var fm frontmatter
@@ -98,14 +104,25 @@ func parseFrontmatter(content string) (frontmatter, string, error) {
 	return fm, body, nil
 }
 
-// ProjectNameFromSlug returns the last meaningful segment of a project slug.
-// e.g. "-Users-antoine-project-ariary-soa" -> "soa"
+// ProjectNameFromSlug returns a human-readable name from a project slug.
+// The slug is an absolute path with "/" replaced by "-" (e.g. "-Users-foo-project-myapp").
+// It strips the home directory prefix and returns the remainder, or falls back to the last token.
 func ProjectNameFromSlug(slug string) string {
-	// slug starts with "-", path segments were joined with "-"
-	// strip leading "-"
+	home, err := os.UserHomeDir()
+	if err == nil {
+		// encode home path as slug: "/Users/foo" -> "-Users-foo"
+		homeSlug := "-" + strings.ReplaceAll(strings.TrimPrefix(home, "/"), "/", "-")
+		if strings.HasPrefix(slug, homeSlug) {
+			rest := strings.TrimPrefix(slug, homeSlug)
+			rest = strings.TrimPrefix(rest, "-")
+			if rest != "" {
+				return rest
+			}
+		}
+	}
+	// fallback: last non-empty token
 	s := strings.TrimPrefix(slug, "-")
 	parts := strings.Split(s, "-")
-	// find last non-empty part
 	for i := len(parts) - 1; i >= 0; i-- {
 		if parts[i] != "" {
 			return parts[i]
