@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -99,5 +100,46 @@ func TestLoadActiveSessions(t *testing.T) {
 	}
 	if s.Project != "tmp/myproject" {
 		t.Errorf("Project = %q, want %q", s.Project, "tmp/myproject")
+	}
+}
+
+func TestLoadHistoricalSessions(t *testing.T) {
+	root := t.TempDir()
+	projDir := filepath.Join(root, "-Users-foo-myproject")
+	if err := os.MkdirAll(projDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	sessionID := "abc-123"
+	lines := []string{
+		`{"type":"custom-title","customTitle":"my-feature","sessionId":"abc-123"}`,
+		`{"type":"user","cwd":"/Users/foo/myproject","sessionId":"abc-123","timestamp":"2026-01-01T10:00:00.000Z"}`,
+		`{"type":"assistant","sessionId":"abc-123","timestamp":"2026-01-01T10:30:00.000Z"}`,
+	}
+	content := strings.Join(lines, "\n") + "\n"
+	jsonlPath := filepath.Join(projDir, sessionID+".jsonl")
+	if err := os.WriteFile(jsonlPath, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := loadHistoricalSessions(root, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(result) != 1 {
+		t.Fatalf("expected 1 session, got %d", len(result))
+	}
+	s := result[0]
+	if s.ID != "abc-123" {
+		t.Errorf("ID = %q, want %q", s.ID, "abc-123")
+	}
+	if s.Name != "my-feature" {
+		t.Errorf("Name = %q, want %q", s.Name, "my-feature")
+	}
+	if s.Cwd != "/Users/foo/myproject" {
+		t.Errorf("Cwd = %q, want %q", s.Cwd, "/Users/foo/myproject")
+	}
+	if s.Duration != 1800 {
+		t.Errorf("Duration = %d, want 1800", s.Duration)
 	}
 }

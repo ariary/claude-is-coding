@@ -1,10 +1,12 @@
 package sessions
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 )
@@ -120,4 +122,125 @@ func loadActiveSessions(dir string) ([]Session, error) {
 		result = append(result, s)
 	}
 	return result, nil
+}
+
+// jsonlEntry is a generic shape for entries in a .jsonl file.
+type jsonlEntry struct {
+	Type        string `json:"type"`
+	CustomTitle string `json:"customTitle"`
+	SessionID   string `json:"sessionId"`
+	Cwd         string `json:"cwd"`
+	Timestamp   string `json:"timestamp"`
+}
+
+// loadHistoricalSessions reads projectsDir and returns sessions sorted by mtime desc.
+// limit == 0 means no limit.
+func loadHistoricalSessions(projectsDir string, limit int) ([]Session, error) {
+	projEntries, err := os.ReadDir(projectsDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("reading projects dir: %w", err)
+	}
+
+	type sessionFile struct {
+		path  string
+		mtime time.Time
+	}
+	var files []sessionFile
+
+	for _, proj := range projEntries {
+		if !proj.IsDir() {
+			continue
+		}
+		projPath := filepath.Join(projectsDir, proj.Name())
+		jsonls, err := filepath.Glob(filepath.Join(projPath, "*.jsonl"))
+		if err != nil {
+			continue
+		}
+		for _, p := range jsonls {
+			info, err := os.Stat(p)
+			if err != nil {
+				continue
+			}
+			files = append(files, sessionFile{path: p, mtime: info.ModTime()})
+		}
+	}
+
+	sort.Slice(files, func(i, j int) bool {
+		return files[i].mtime.After(files[j].mtime)
+	})
+
+	if limit > 0 && len(files) > limit {
+		files = files[:limit]
+	}
+
+	var result []Session
+	for _, f := range files {
+		s, err := parseSessionFile(f.path, f.mtime)
+		if err != nil || s == nil {
+			continue
+		}
+		result = append(result, *s)
+	}
+	return result, nil
+}
+
+// parseSessionFile reads a .jsonl file and extracts Session data.
+func parseSessionFile(path string, mtime time.Time) (*Session, error) {
+	fh, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer fh.Close()
+
+	base := filepath.Base(path)
+	sessionID := strings.TrimSuffix(base, ".jsonl")
+	if sessionID == "" {
+		return nil, nil
+	}
+
+	var name, cwd string
+	var firstTS, lastTS time.Time
+
+	scanner := bufio.NewScanner(fh)
+	scanner.Buffer(make([]byte, 1024*1024), 1024*1024)
+	for scanner.Scan() {
+		line := scanner.Bytes()
+		var entry jsonlEntry
+		if err := json.Unmarshal(line, &entry); err != nil {
+			continue
+		}
+		if entry.Type == "custom-title" && entry.CustomTitle != "" {
+			name = entry.CustomTitle
+		}
+		if entry.Cwd != "" && cwd == "" {
+			cwd = entry.Cwd
+		}
+		if entry.Timestamp != "" {
+			t, err := time.Parse(time.RFC3339Nano, entry.Timestamp)
+			if err == nil {
+				if firstTS.IsZero() {
+					firstTS = t
+				}
+				lastTS = t
+			}
+		}
+	}
+
+	var duration int64
+	if !firstTS.IsZero() && !lastTS.IsZero() && lastTS.After(firstTS) {
+		duration = int64(lastTS.Sub(firstTS).Seconds())
+	}
+
+	return &Session{
+		ID:       sessionID,
+		Name:     name,
+		Cwd:      cwd,
+		Project:  projectFromCwd(cwd),
+		LastUsed: mtime.Unix(),
+		Duration: duration,
+		Active:   false,
+	}, nil
 }
