@@ -22,10 +22,54 @@ type Session struct {
 	Active   bool   // true if PID exists in ~/.claude/sessions/
 }
 
-// Load returns up to limit sessions sorted by LastUsed descending.
-// If limit == 0, all sessions are returned.
+// Load returns sessions sorted by LastUsed descending.
+// limit == 0 means no limit.
 func Load(limit int) ([]Session, error) {
-	return nil, nil
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return nil, fmt.Errorf("getting home dir: %w", err)
+	}
+
+	sessionsDir := filepath.Join(home, ".claude", "sessions")
+	projectsDir := filepath.Join(home, ".claude", "projects")
+
+	active, err := loadActiveSessions(sessionsDir)
+	if err != nil {
+		return nil, err
+	}
+
+	historical, err := loadHistoricalSessions(projectsDir, limit)
+	if err != nil {
+		return nil, err
+	}
+
+	return mergeAndDedup(historical, active, limit), nil
+}
+
+// mergeAndDedup merges historical and active sessions, deduplicates by ID
+// (active wins), sorts by LastUsed descending, applies limit (0 = no limit).
+func mergeAndDedup(historical, active []Session, limit int) []Session {
+	seen := make(map[string]Session)
+	for _, s := range historical {
+		seen[s.ID] = s
+	}
+	for _, s := range active {
+		seen[s.ID] = s
+	}
+
+	merged := make([]Session, 0, len(seen))
+	for _, s := range seen {
+		merged = append(merged, s)
+	}
+
+	sort.Slice(merged, func(i, j int) bool {
+		return merged[i].LastUsed > merged[j].LastUsed
+	})
+
+	if limit > 0 && len(merged) > limit {
+		merged = merged[:limit]
+	}
+	return merged
 }
 
 // projectFromCwd returns the last 2 path segments of cwd for display.

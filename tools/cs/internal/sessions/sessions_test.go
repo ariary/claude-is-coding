@@ -143,3 +143,49 @@ func TestLoadHistoricalSessions(t *testing.T) {
 		t.Errorf("Duration = %d, want 1800", s.Duration)
 	}
 }
+
+func TestMergeAndDedupActiveWins(t *testing.T) {
+	active := Session{ID: "x", Name: "active-name", Cwd: "/a", Active: true, LastUsed: 999}
+	historical := Session{ID: "x", Name: "old-name", Cwd: "/a", Active: false, LastUsed: 500}
+
+	merged := mergeAndDedup([]Session{historical}, []Session{active}, 0)
+	if len(merged) != 1 {
+		t.Fatalf("expected 1 session after dedup, got %d", len(merged))
+	}
+	if !merged[0].Active {
+		t.Error("merged session should be active")
+	}
+	if merged[0].Name != "active-name" {
+		t.Errorf("Name = %q, want %q", merged[0].Name, "active-name")
+	}
+}
+
+func TestMergeAndDedupSortsByLastUsedDesc(t *testing.T) {
+	historical := []Session{
+		{ID: "a", LastUsed: 100},
+		{ID: "b", LastUsed: 300},
+		{ID: "c", LastUsed: 200},
+	}
+	merged := mergeAndDedup(historical, nil, 0)
+	if len(merged) != 3 {
+		t.Fatalf("expected 3 sessions, got %d", len(merged))
+	}
+	if merged[0].ID != "b" || merged[1].ID != "c" || merged[2].ID != "a" {
+		t.Errorf("wrong sort order: got [%s %s %s]", merged[0].ID, merged[1].ID, merged[2].ID)
+	}
+}
+
+func TestMergeAndDedupLimit(t *testing.T) {
+	historical := []Session{
+		{ID: "a", LastUsed: 100},
+		{ID: "b", LastUsed: 300},
+		{ID: "c", LastUsed: 200},
+	}
+	merged := mergeAndDedup(historical, nil, 2)
+	if len(merged) != 2 {
+		t.Fatalf("expected 2 sessions with limit=2, got %d", len(merged))
+	}
+	if merged[0].ID != "b" || merged[1].ID != "c" {
+		t.Errorf("wrong sessions after limit: got [%s %s]", merged[0].ID, merged[1].ID)
+	}
+}
