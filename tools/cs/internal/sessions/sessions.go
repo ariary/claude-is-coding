@@ -1,8 +1,11 @@
 package sessions
 
 import (
+	"encoding/json"
 	"fmt"
+	"os"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -70,4 +73,51 @@ func FormatDuration(secs int64) string {
 	default:
 		return fmt.Sprintf("%ds", s)
 	}
+}
+
+type activeSessionFile struct {
+	PID       int    `json:"pid"`
+	SessionID string `json:"sessionId"`
+	Cwd       string `json:"cwd"`
+	StartedAt int64  `json:"startedAt"` // milliseconds
+	Name      string `json:"name"`
+}
+
+// loadActiveSessions reads all .json files in dir and returns active Sessions.
+func loadActiveSessions(dir string) ([]Session, error) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("reading sessions dir: %w", err)
+	}
+
+	now := time.Now().Unix()
+	var result []Session
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".json") {
+			continue
+		}
+		data, err := os.ReadFile(filepath.Join(dir, e.Name()))
+		if err != nil {
+			continue
+		}
+		var f activeSessionFile
+		if err := json.Unmarshal(data, &f); err != nil || f.SessionID == "" {
+			continue
+		}
+		startedSec := f.StartedAt / 1000
+		s := Session{
+			ID:       f.SessionID,
+			Name:     f.Name,
+			Cwd:      f.Cwd,
+			Project:  projectFromCwd(f.Cwd),
+			LastUsed: now,
+			Duration: now - startedSec,
+			Active:   true,
+		}
+		result = append(result, s)
+	}
+	return result, nil
 }

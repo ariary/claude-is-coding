@@ -1,6 +1,9 @@
 package sessions
 
 import (
+	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 )
@@ -59,5 +62,42 @@ func TestFormatDuration(t *testing.T) {
 		if got != c.want {
 			t.Errorf("FormatDuration(%d) = %q, want %q", c.secs, got, c.want)
 		}
+	}
+}
+
+func TestLoadActiveSessions(t *testing.T) {
+	dir := t.TempDir()
+	content := `{"pid":1234,"sessionId":"aaa-bbb","cwd":"/tmp/myproject","startedAt":` +
+		fmt.Sprintf("%d", (time.Now().Unix()-300)*1000) +
+		`,"kind":"interactive","entrypoint":"cli","name":"my-test-session"}`
+	if err := os.WriteFile(filepath.Join(dir, "1234.json"), []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := loadActiveSessions(dir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(result) != 1 {
+		t.Fatalf("expected 1 session, got %d", len(result))
+	}
+	s := result[0]
+	if s.ID != "aaa-bbb" {
+		t.Errorf("ID = %q, want %q", s.ID, "aaa-bbb")
+	}
+	if s.Name != "my-test-session" {
+		t.Errorf("Name = %q, want %q", s.Name, "my-test-session")
+	}
+	if s.Cwd != "/tmp/myproject" {
+		t.Errorf("Cwd = %q, want %q", s.Cwd, "/tmp/myproject")
+	}
+	if !s.Active {
+		t.Error("Active = false, want true")
+	}
+	if s.Duration < 290 || s.Duration > 310 {
+		t.Errorf("Duration = %d, want ~300", s.Duration)
+	}
+	if s.Project != "tmp/myproject" {
+		t.Errorf("Project = %q, want %q", s.Project, "tmp/myproject")
 	}
 }
