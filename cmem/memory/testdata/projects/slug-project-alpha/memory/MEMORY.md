@@ -1,0 +1,1 @@
+- [No Claude co-author](feedback_no_coauthor.md) — omit Co-Authored-By Claude from all commits
