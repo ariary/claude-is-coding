@@ -38,9 +38,7 @@ var showCmd = &cobra.Command{
 			return nil
 		}
 
-		fmt.Fprintf(os.Stderr, "entry not found: project=%q file=%q\n", projectFilter, fileFilter)
-		os.Exit(1)
-		return nil
+		return fmt.Errorf("entry not found: project=%q file=%q", projectFilter, fileFilter)
 	},
 }
 

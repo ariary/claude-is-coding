@@ -31,8 +31,7 @@ var promoteCmd = &cobra.Command{
 			}
 		}
 		if target == nil {
-			fmt.Fprintf(os.Stderr, "entry not found: project=%q file=%q\n", projectFilter, fileFilter)
-			os.Exit(1)
+			return fmt.Errorf("entry not found: project=%q file=%q", projectFilter, fileFilter)
 		}
 
 		claudePath, err := globalCLAUDEMDPath()
@@ -43,7 +42,8 @@ var promoteCmd = &cobra.Command{
 		// read existing content
 		existing, _ := os.ReadFile(claudePath)
 		header := fmt.Sprintf("## %s", target.Name)
-		if strings.Contains(string(existing), header) {
+		existingStr := string(existing)
+		if strings.Contains(existingStr, "\n"+header+"\n") || strings.HasPrefix(existingStr, header+"\n") {
 			fmt.Fprintf(os.Stdout, "already promoted: %q\n", target.Name)
 			return nil
 		}

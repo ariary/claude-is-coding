@@ -34,11 +34,14 @@ var statsCmd = &cobra.Command{
 		}
 		fmt.Fprintf(os.Stdout, "total\t%d\n", len(entries))
 
-		// de-dupe candidates: entries whose Name appears in 2+ projects
-		nameToProjects := map[string][]string{}
+		// de-dupe candidates: entries whose Name appears in 2+ distinct projects
+		nameToProjectSet := map[string]map[string]struct{}{}
 		for _, e := range entries {
 			key := strings.ToLower(e.Name)
-			nameToProjects[key] = append(nameToProjects[key], e.Project)
+			if nameToProjectSet[key] == nil {
+				nameToProjectSet[key] = map[string]struct{}{}
+			}
+			nameToProjectSet[key][e.Project] = struct{}{}
 		}
 
 		type dup struct {
@@ -46,13 +49,21 @@ var statsCmd = &cobra.Command{
 			projects []string
 		}
 		var dups []dup
-		for name, projects := range nameToProjects {
-			if len(projects) >= 2 {
+		for name, projectSet := range nameToProjectSet {
+			if len(projectSet) >= 2 {
+				var projects []string
+				for p := range projectSet {
+					projects = append(projects, p)
+				}
+				sort.Strings(projects)
 				dups = append(dups, dup{name, projects})
 			}
 		}
 		sort.Slice(dups, func(i, j int) bool {
-			return len(dups[i].projects) > len(dups[j].projects)
+			if len(dups[i].projects) != len(dups[j].projects) {
+				return len(dups[i].projects) > len(dups[j].projects)
+			}
+			return dups[i].name < dups[j].name
 		})
 
 		if len(dups) > 0 {

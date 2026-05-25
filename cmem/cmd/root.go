@@ -9,8 +9,10 @@ import (
 var baseDir string
 
 var rootCmd = &cobra.Command{
-	Use:   "cmem",
-	Short: "Browse and promote Claude Code memory across projects",
+	Use:          "cmem",
+	Short:        "Browse and promote Claude Code memory across projects",
+	SilenceErrors: true,
+	SilenceUsage:  true,
 }
 
 // Execute runs the root command.
