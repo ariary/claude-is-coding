@@ -34,14 +34,19 @@ var statsCmd = &cobra.Command{
 		}
 		fmt.Fprintf(os.Stdout, "total\t%d\n", len(entries))
 
-		// de-dupe candidates: entries whose Name appears in 2+ distinct projects
+		// de-dupe candidates: entries whose Name or Description appears in 2+ distinct projects
 		nameToProjectSet := map[string]map[string]struct{}{}
-		for _, e := range entries {
-			key := strings.ToLower(e.Name)
+		addKey := func(key, project string) {
 			if nameToProjectSet[key] == nil {
 				nameToProjectSet[key] = map[string]struct{}{}
 			}
-			nameToProjectSet[key][e.Project] = struct{}{}
+			nameToProjectSet[key][project] = struct{}{}
+		}
+		for _, e := range entries {
+			addKey(strings.ToLower(e.Name), e.Project)
+			if e.Description != "" {
+				addKey(strings.ToLower(e.Description), e.Project)
+			}
 		}
 
 		type dup struct {

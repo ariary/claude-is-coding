@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/ariary/cmem/memory"
@@ -70,7 +71,7 @@ func globalCLAUDEMDPath() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return home + "/.claude/CLAUDE.md", nil
+	return filepath.Join(home, ".claude", "CLAUDE.md"), nil
 }
 
 func init() {
