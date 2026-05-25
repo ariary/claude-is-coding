@@ -18,3 +18,4 @@ A collection of Claude Code things (abuse, skills, config) for security research
 |---|---|
 | Self-improving feedback loop via adversarial AI debate | [`claude-lajan`](claude-lajan) |
 | Browse, analyse, and promote Claude memory across projects | [`cmem`](cmem) |
+| Fuzzy session switcher — browse all Claude sessions and jump in | [`cs`](cs) |
