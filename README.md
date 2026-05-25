@@ -11,3 +11,10 @@ A collection of Claude Code things (abuse, skills, config) for security research
 | Remote SSH access from Android via personal sshd + ngrok TCP | [`malicious/remote-control-alternative`](malicious/remote-control-alternative) |
 | Silent hook injection via HTML comment prompt injection | [`malicious/silent-hook-injection`](malicious/silent-hook-injection) |
 | Auto-rename session with meaningful title from first prompt | [`hooks/auto-session-rename`](hooks/auto-session-rename) |
+
+## Tools
+
+| Tool | Directory |
+|---|---|
+| Self-improving feedback loop via adversarial AI debate | [`claude-lajan`](claude-lajan) |
+| Browse, analyse, and promote Claude memory across projects | [`cmem`](cmem) |
