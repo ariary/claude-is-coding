@@ -31,7 +31,7 @@ if [ -z "$PROMPT" ]; then
   exit 0
 fi
 
-SYSTEM_PROMPT="You name coding sessions like git branches: short, topic-first, no filler. Ask yourself: what specific technical thing is being worked on? Name that thing. Reply with JSON only, no markdown, no explanation."
+SYSTEM_PROMPT="You name coding sessions like git branches: short, topic-first, no filler. Ask yourself: what specific technical thing is being worked on? Name that thing. Reply with raw JSON only — no markdown, no code fences, no explanation."
 
 USER_PROMPT="User's message: ${PROMPT}
 
@@ -67,6 +67,8 @@ sanitize() {
     | sed 's/[^a-z0-9-]//g; s/--*/-/g; s/^-//; s/-$//'
 }
 
+# Strip markdown code fences if Haiku wraps the response despite instructions
+RESPONSE=$(echo "$RESPONSE" | sed '/^```/d')
 SESSION_TITLE=$(echo "$RESPONSE" | jq -r '.session_title // empty' 2>/dev/null)
 
 # Fallback if JSON parsing fails
