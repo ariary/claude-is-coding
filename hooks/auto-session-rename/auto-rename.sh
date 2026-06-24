@@ -31,23 +31,20 @@ if [ -z "$PROMPT" ]; then
   exit 0
 fi
 
-SYSTEM_PROMPT="You generate session titles for coding sessions. The title must be the TECHNICAL SUBJECT only — what is being built, fixed, debugged, or discussed. The output title MUST NOT contain these words: help, me, you, can, please, want, need, how, explain, possible, i, is, it, yes, fact, do, get, make, just, some, more, clearly. Reply with JSON only, no markdown, no explanation."
+SYSTEM_PROMPT="You name coding sessions like git branches: short, topic-first, no filler. Ask yourself: what specific technical thing is being worked on? Name that thing. Reply with JSON only, no markdown, no explanation."
 
 USER_PROMPT="User's message: ${PROMPT}
 
-Good examples (topic-first, no filler):
+Examples:
 - 'is it possible in claude hook to detect if it is the first prompt' → 'detect-first-prompt-resumed-session'
 - 'how do i add pagination to the users endpoint' → 'add-users-endpoint-pagination'
 - 'yes in fact the issue occurs when I restart my device' → 'rename-flag-lost-on-reboot'
+- 'help me fix the login bug' → 'fix-login-bug'
 - 'can you explain option 2 more clearly' → 'clarify-sessionstart-resume-option'
-
-Bad examples (filler leaked into title — NEVER do this):
-- 'help me fix the login bug' → ❌ 'help-me-fix-login' → ✅ 'fix-login-bug'
-- 'can you help me understand pagination' → ❌ 'help-understand-pagination' → ✅ 'pagination-explained'
 
 Return JSON:
 {
-  \"session_title\": \"3-6 words, lowercase, hyphen-separated, the technical subject only\"
+  \"session_title\": \"3-6 words, lowercase, hyphen-separated, the specific technical subject\"
 }"
 
 RESPONSE=$(curl -s https://api.anthropic.com/v1/messages \
