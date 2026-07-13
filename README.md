@@ -11,6 +11,7 @@ A collection of Claude Code things (abuse, skills, config) for security research
 | Remote SSH access from Android via personal sshd + ngrok TCP | [`malicious/remote-control-alternative`](malicious/remote-control-alternative) |
 | Silent hook injection via HTML comment prompt injection | [`malicious/silent-hook-injection`](malicious/silent-hook-injection) |
 | Auto-rename session with meaningful title from first prompt | [`hooks/auto-session-rename`](hooks/auto-session-rename) |
+| Read the last Claude response aloud on demand via macOS `say` | [`hooks/speak-response`](hooks/speak-response) |
 
 ## Tools
 

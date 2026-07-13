@@ -1,14 +1,17 @@
 # Auto Session Rename
 
-Automatically rename your Claude Code session with a meaningful title based on your first message. Uses a `UserPromptSubmit` hook that calls Haiku to summarize your prompt into a concise 3-6 word title.
+Automatically rename your Claude Code session with a meaningful title based on your first message. Uses a `UserPromptSubmit` hook that calls Haiku to summarize your prompt into a concise 3-6 word title focused on the technical subject — not the conversational framing.
+
+A companion `SessionStart` hook prevents re-renaming when you resume a session after a device reboot.
 
 **Examples:**
 
 | First prompt | Session title |
 |---|---|
-| "I want to refactor the auth middleware to use JWT tokens" | refactor-auth-to-jwt |
-| "Fix the bug where users can't log in on mobile" | fix-mobile-login-bug |
-| "Add a dark mode toggle to the settings page" | add-dark-mode-toggle |
+| "is it possible in claude hook to detect if it is the first prompt" | detect-first-prompt-resumed-session |
+| "how do i add pagination to the users endpoint" | add-users-endpoint-pagination |
+| "fix the bug where users can't log in on mobile" | fix-mobile-login-bug |
+| "can you explain option 2 more clearly" | clarify-sessionstart-resume-option |
 
 ## Prerequisites
 
@@ -18,49 +21,78 @@ Automatically rename your Claude Code session with a meaningful title based on y
 
 ## Setup
 
-### 1. Copy the hook script
+### 1. Copy the hook scripts
 
 ```bash
 mkdir -p ~/.claude/hooks
 cp auto-rename.sh ~/.claude/hooks/auto-rename.sh
+cp session-start.sh ~/.claude/hooks/session-start.sh
 chmod +x ~/.claude/hooks/auto-rename.sh
+chmod +x ~/.claude/hooks/session-start.sh
 ```
 
-### 2. Register the hook
+### 2. Register the hooks
 
 Add this to your Claude Code settings (`~/.claude/settings.json`):
 
 ```json
 {
   "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/session-start.sh"
+          }
+        ]
+      }
+    ],
     "UserPromptSubmit": [
       {
-        "type": "command",
-        "command": "bash ~/.claude/hooks/auto-rename.sh"
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/auto-rename.sh"
+          }
+        ]
       }
     ]
   }
 }
 ```
 
-> If you already have other `UserPromptSubmit` hooks, just append the entry to the existing array.
+> If you already have other hooks, append the entries to the existing arrays.
 
 ### 3. Done
 
-Start a new Claude Code session and send a message. The session gets renamed automatically based on your first prompt. Subsequent prompts are ignored (no re-renaming).
+Start a new Claude Code session and send a message. The session gets renamed automatically based on your first prompt. Subsequent prompts are ignored (no re-renaming), including after a device reboot.
 
 ## How it works
 
 ```
-User sends first prompt
-  → UserPromptSubmit hook fires
-  → Script checks /tmp/claude-renamed-<session-id>
-    → Flag exists? → return {} (no-op)
-    → Flag missing? → continue
-  → Creates flag file
-  → Calls Haiku API: "summarize this into a 3-6 word title"
-  → Returns { hookSpecificOutput: { sessionTitle: "<title>" } }
-  → Session is renamed
+New session:
+  User sends first prompt
+    → UserPromptSubmit → auto-rename.sh
+      → flag /tmp/claude-renamed-<id> missing → continue
+      → calls Haiku: extracts technical subject from prompt
+      → sets session title, writes flag
+
+  Subsequent prompts:
+    → flag exists → skip (~1ms, no API call)
+
+Resume after reboot (/tmp cleared):
+  → SessionStart fires (source == "resume")
+    → session_title already set → pre-touches /tmp/claude-renamed-<id>
+  User sends first prompt
+    → auto-rename.sh → flag exists → skip ✓
+
+Resume after reboot (session had no title yet):
+  → SessionStart fires → session_title empty → does nothing
+  User sends first prompt
+    → auto-rename.sh → flag missing → renames ✓
 ```
 
 ## Performance
@@ -72,5 +104,5 @@ User sends first prompt
 ## Customization
 
 - **Model**: Change `claude-haiku-4-5-20251001` to any model (e.g. `claude-sonnet-4-6` for slightly better titles, at higher cost/latency)
-- **Title length**: Adjust `max_tokens` and the prompt wording (`3-6 word title`)
+- **Title length**: Adjust `max_tokens` and the prompt wording (`3-6 words`)
 - **Scope**: Move the settings entry from `~/.claude/settings.json` (global) to `<project>/.claude/settings.json` (per-project) to only enable it in specific projects
